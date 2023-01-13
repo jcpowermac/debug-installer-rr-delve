@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+REPO=https://github.com/openshift/installer
 # BRANCH=release-4.11
 BRANCH=master
 

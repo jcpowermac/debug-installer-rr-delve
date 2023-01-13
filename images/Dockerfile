@@ -1,13 +1,14 @@
 FROM quay.io/fedora/fedora:latest AS builder
 
 ARG BRANCH=master
+ARG REPO=https://github.com/openshift/installer
 ENV WORKDIR_PATH="/go/src/github.com/openshift/installer/"
 
 RUN mkdir -p $WORKDIR_PATH
 WORKDIR $WORKDIR_PATH
 COPY debug.patch ..
 RUN dnf install golang git zip -y && \
-    git clone --single-branch --branch $BRANCH https://github.com/openshift/installer . && \
+    git clone --single-branch --branch $BRANCH $REPO . && \
     git apply ../debug.patch && \
     hack/build.sh
 
