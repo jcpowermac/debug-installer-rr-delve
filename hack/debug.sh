@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. config.sh
+. ./hack/config.sh
 
 if ! podman volume exists ${VOLUME_NAME}; then
 podman volume create ${VOLUME_NAME}
