@@ -11,7 +11,6 @@ podman run --rm \
     --publish 0.0.0.0:2345:2345 \
     --cap-add=SYS_PTRACE \
     --cap-add=PERFMON \
-    --cap-add=SYS_ADMIN \
     --privileged \
     --security-opt seccomp=unconfined \
     --interactive \
@@ -28,3 +27,5 @@ podman run --rm \
     --api-version=2 \
     --accept-multiclient /trace/openshift-install-0
 
+# Not extensively tested, add back if needed
+#    --cap-add=SYS_ADMIN \

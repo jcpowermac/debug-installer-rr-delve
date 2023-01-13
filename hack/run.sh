@@ -14,7 +14,6 @@ podman run --rm \
     --name record-installer \
     --cap-add=SYS_PTRACE \
     --cap-add=PERFMON \
-    --cap-add=SYS_ADMIN \
     --privileged \
     --security-opt seccomp=unconfined \
     --interactive \
