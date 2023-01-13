@@ -1,3 +1,8 @@
 #!/bin/bash
 
-podman build -f images/Dockerfile -t installer-debug .
+. config.sh
+
+podman build \
+    --build-arg BRANCH=${BRANCH}
+    --file images/Dockerfile
+    --tag installer-debug:${BRANCH} .
