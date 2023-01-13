@@ -7,8 +7,8 @@ ENV WORKDIR_PATH="/go/src/github.com/openshift/installer/"
 RUN mkdir -p $WORKDIR_PATH
 WORKDIR $WORKDIR_PATH
 COPY debug.patch ..
-RUN dnf install golang git zip -y && \
-    git clone --single-branch --branch $BRANCH $REPO . && \
+RUN dnf install golang git zip -y
+RUN git clone --single-branch --branch $BRANCH $REPO . && \
     git apply ../debug.patch && \
     hack/build.sh
 
