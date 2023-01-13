@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. config.sh
+. ./hack/config.sh
 
 sudo sysctl kernel.perf_event_paranoid=-1
 sudo sysctl kernel.kptr_restrict=0
@@ -21,5 +21,9 @@ podman run --rm \
     --tty \
     --env _RR_TRACE_DIR=/trace \
     --volume ${VOLUME_NAME}:/trace:Z \
-    installer-debug:${BRANCH} record --disable-avx-512 openshift-install create cluster --log-level debug
+    --volume ./installer-dir/:/installer:Z \
+    installer-debug:${BRANCH} \
+    record \
+    --disable-avx-512 \
+    openshift-install create cluster --log-level debug --dir /installer
 

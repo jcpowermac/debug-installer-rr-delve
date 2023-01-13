@@ -1,8 +1,8 @@
 #!/bin/bash
 
-. config.sh
+. ./hack/config.sh
 
 podman build \
-    --build-arg BRANCH=${BRANCH}
-    --file images/Dockerfile
+    --build-arg BRANCH=${BRANCH} \
+    --file images/Dockerfile \
     --tag installer-debug:${BRANCH} .
