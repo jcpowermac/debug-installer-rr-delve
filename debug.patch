@@ -1,0 +1,60 @@
+diff --git a/hack/build.sh b/hack/build.sh
+index c5b9156ed3..0c157442bf 100755
+--- a/hack/build.sh
++++ b/hack/build.sh
+@@ -52,7 +52,7 @@ export CGO_ENABLED=0
+ 
+ case "${MODE}" in
+ release)
+-	LDFLAGS="${LDFLAGS} -s -w"
++	#LDFLAGS="${LDFLAGS}"
+ 	TAGS="${TAGS} release"
+ 	if test "${SKIP_GENERATION}" != y
+ 	then
+@@ -73,4 +73,4 @@ then
+ fi
+ 
+ # shellcheck disable=SC2086
+-go build ${GOFLAGS} -ldflags "${LDFLAGS}" -tags "${TAGS}" -o "${OUTPUT}" ./cmd/openshift-install
++go build ${GOFLAGS} -gcflags "all=-N -l" -ldflags "${LDFLAGS}" -tags "${TAGS}" -o "${OUTPUT}" ./cmd/openshift-install
+diff --git a/terraform/Makefile b/terraform/Makefile
+index 524b550535..9d3def5891 100644
+--- a/terraform/Makefile
++++ b/terraform/Makefile
+@@ -7,7 +7,8 @@ GO_BUILD_TARGETS:=	$(foreach DIR,$(TFSUBDIRS), $(subst $(DIR),go-build.$(DIR),$(
+ GO_CLEAN_TARGETS:=	$(foreach DIR,$(TFSUBDIRS), $(subst $(DIR),go-clean.$(DIR),$(DIR)))
+ TERRAFORM_PROVIDER_TARGETS := $(foreach DIR,$(TFSUBDIRS), bin/$(TARGET_OS_ARCH)/terraform-provider-$(DIR).zip)
+ 
+-LDFLAGS:= "-s -w"
++LDFLAGS:= ""
++GCFLAGS:= "all=-N -l"
+ 
+ .PHONY: all
+ all: go-build
+@@ -26,7 +27,7 @@ $(GO_BUILD_TARGETS): go-build.%: bin/$(TARGET_OS_ARCH)/terraform-provider-%.zip
+ $(TERRAFORM_PROVIDER_TARGETS): bin/$(TARGET_OS_ARCH)/terraform-provider-%.zip: providers/%/go.mod
+ 	cd providers/$*; \
+ 	if [ -f main.go ]; then path="."; else path=./vendor/`grep _ tools.go|awk '{ print $$2 }'|sed 's|"||g'`; fi; \
+-	go build -ldflags $(LDFLAGS) -o ../../bin/$(TARGET_OS_ARCH)/terraform-provider-$* "$$path"; \
++	go build -gcflags $(GCFLAGS) -ldflags $(LDFLAGS) -o ../../bin/$(TARGET_OS_ARCH)/terraform-provider-$* "$$path"; \
+ 	zip -1j ../../bin/$(TARGET_OS_ARCH)/terraform-provider-$*.zip ../../bin/$(TARGET_OS_ARCH)/terraform-provider-$*;
+ 
+ .PHONY: go-build-terraform
+@@ -34,7 +35,7 @@ go-build-terraform: bin/$(TARGET_OS_ARCH)/terraform
+ 
+ bin/$(TARGET_OS_ARCH)/terraform: terraform/go.mod
+ 	cd terraform; \
+-	go build -ldflags $(LDFLAGS) -o ../bin/$(TARGET_OS_ARCH)/terraform ./vendor/github.com/hashicorp/terraform
++	go build -gcflags $(GCFLAGS) -ldflags $(LDFLAGS) -o ../bin/$(TARGET_OS_ARCH)/terraform ./vendor/github.com/hashicorp/terraform
+ 
+ .PHONY: go-clean
+ go-clean: go-clean-providers go-clean-terraform
+@@ -45,7 +46,7 @@ $(GO_CLEAN_TARGETS): go-clean.%:
+ 
+ go-clean-providers:
+ 	rm -f bin/*/terraform-provider-*
+-	
++
+ go-clean-terraform:
+ 	rm -f bin/*/terraform
+ 
