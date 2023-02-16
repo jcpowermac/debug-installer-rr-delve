@@ -1,0 +1,135 @@
+From c2850ff02f2e0716b93c281a2f26ed165683c122 Mon Sep 17 00:00:00 2001
+From: Joseph Callen <jcallen@redhat.com>
+Date: Fri, 3 Feb 2023 23:28:54 -0500
+Subject: [PATCH] working with forked terraform provider
+
+---
+ cmd/dlv/cmds/commands.go     | 21 +++++++++++++++++----
+ pkg/proc/gdbserial/rr.go     | 17 ++++++++++++++---
+ service/debugger/debugger.go |  6 ++++--
+ 3 files changed, 35 insertions(+), 9 deletions(-)
+
+diff --git a/cmd/dlv/cmds/commands.go b/cmd/dlv/cmds/commands.go
+index 39c0b3ea5..8b29ce45d 100644
+--- a/cmd/dlv/cmds/commands.go
++++ b/cmd/dlv/cmds/commands.go
+@@ -91,6 +91,8 @@ var (
+ 
+ 	conf        *config.Config
+ 	loadConfErr error
++
++	replayOnprocessPid int
+ )
+ 
+ const dlvCommandLongDesc = `Delve is a source level debugger for Go programs.
+@@ -363,11 +365,11 @@ https://github.com/mozilla/rr
+ 				}
+ 				return nil
+ 			},
+-			Run: func(cmd *cobra.Command, args []string) {
+-				backend = "rr"
+-				os.Exit(execute(0, []string{}, conf, args[0], debugger.ExecutingOther, args, buildFlags))
+-			},
++			Run: replayCmd,
+ 		}
++
++		replayCommand.Flags().IntVarP(&replayOnprocessPid, "replayPid", "p", 0, "rr onprocess pid to attach to.")
++
+ 		rootCommand.AddCommand(replayCommand)
+ 	}
+ 
+@@ -551,6 +553,16 @@ func debugCmd(cmd *cobra.Command, args []string) {
+ 	os.Exit(status)
+ }
+ 
++func replayCmd(cmd *cobra.Command, args []string) {
++	backend = "rr"
++	fmt.Print("in replayCmd")
++
++	exitCode := execute(0, []string{}, conf, args[0], debugger.ExecutingOther, args, buildFlags)
++
++	os.Exit(exitCode)
++
++}
++
+ func traceCmd(cmd *cobra.Command, args []string) {
+ 	status := func() int {
+ 		err := logflags.Setup(log, logOutput, logDest)
+@@ -981,6 +993,7 @@ func execute(attachPid int, processArgs []string, conf *config.Config, coreFile
+ 				TTY:                  tty,
+ 				Redirects:            redirects,
+ 				DisableASLR:          disableASLR,
++				ReplayOnprocessPid:   replayOnprocessPid,
+ 			},
+ 		})
+ 	default:
+diff --git a/pkg/proc/gdbserial/rr.go b/pkg/proc/gdbserial/rr.go
+index e133b12bd..960dbca6d 100644
+--- a/pkg/proc/gdbserial/rr.go
++++ b/pkg/proc/gdbserial/rr.go
+@@ -124,12 +124,23 @@ func Record(cmd []string, wd string, quiet bool, redirects [3]string) (tracedir
+ 
+ // Replay starts an instance of rr in replay mode, with the specified trace
+ // directory, and connects to it.
+-func Replay(tracedir string, quiet, deleteOnDetach bool, debugInfoDirs []string) (*proc.Target, error) {
++func Replay(tracedir string, quiet, deleteOnDetach bool, debugInfoDirs []string, rrOnProcessPid int) (*proc.Target, error) {
+ 	if err := checkRRAvailable(); err != nil {
+ 		return nil, err
+ 	}
+ 
+-	rrcmd := exec.Command("rr", "replay", "--dbgport=0", tracedir)
++	args := []string{
++		"replay",
++		"--dbgport=0",
++	}
++	if rrOnProcessPid != 0 {
++		args = append(args, fmt.Sprintf("--onprocess=%d", rrOnProcessPid))
++		args = append(args, fmt.Sprintf("--tty=%d.out", rrOnProcessPid))
++		args = append(args, "--serve-files")
++	}
++	args = append(args, tracedir)
++
++	rrcmd := exec.Command("rr", args...)
+ 	rrcmd.Stdout = os.Stdout
+ 	stderr, err := rrcmd.StderrPipe()
+ 	if err != nil {
+@@ -284,7 +295,7 @@ func RecordAndReplay(cmd []string, wd string, quiet bool, debugInfoDirs []string
+ 	if tracedir == "" {
+ 		return nil, "", err
+ 	}
+-	t, err := Replay(tracedir, quiet, true, debugInfoDirs)
++	t, err := Replay(tracedir, quiet, true, debugInfoDirs, 0)
+ 	return t, tracedir, err
+ }
+ 
+diff --git a/service/debugger/debugger.go b/service/debugger/debugger.go
+index 746d16747..dc6d104fa 100644
+--- a/service/debugger/debugger.go
++++ b/service/debugger/debugger.go
+@@ -142,6 +142,8 @@ type Config struct {
+ 
+ 	// DisableASLR disables ASLR
+ 	DisableASLR bool
++
++	ReplayOnprocessPid int
+ }
+ 
+ // New creates a new Debugger. ProcessArgs specify the commandline arguments for the
+@@ -176,7 +178,7 @@ func New(config *Config, processArgs []string) (*Debugger, error) {
+ 		switch d.config.Backend {
+ 		case "rr":
+ 			d.log.Infof("opening trace %s", d.config.CoreFile)
+-			p, err = gdbserial.Replay(d.config.CoreFile, false, false, d.config.DebugInfoDirectories)
++			p, err = gdbserial.Replay(d.config.CoreFile, false, false, d.config.DebugInfoDirectories, d.config.ReplayOnprocessPid)
+ 		default:
+ 			d.log.Infof("opening core file %s (executable %s)", d.config.CoreFile, d.processArgs[0])
+ 			p, err = core.OpenCore(d.config.CoreFile, d.processArgs[0], d.config.DebugInfoDirectories)
+@@ -339,7 +341,7 @@ func (d *Debugger) recordingRun(run func() (string, error)) (*proc.Target, error
+ 		return nil, err
+ 	}
+ 
+-	return gdbserial.Replay(tracedir, false, true, d.config.DebugInfoDirectories)
++	return gdbserial.Replay(tracedir, false, true, d.config.DebugInfoDirectories, 0)
+ }
+ 
+ // Attach will attach to the process specified by 'pid'.
